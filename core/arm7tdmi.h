@@ -8,7 +8,7 @@
 #include "mmu.h"
 
 void arm7_reset();
-void arm7_update_gprs();
+void arm7_update_regs();
 void arm7_step();
 
 uint8_t arm7_readb(uint32_t ptr);

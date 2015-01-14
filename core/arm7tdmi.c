@@ -198,6 +198,8 @@ uint32_t spsr_svc;
 uint32_t spsr_abt;
 uint32_t spsr_irq;
 uint32_t spsr_und;
+uint32_t spsr_dummy; // this is a dummy for code safety (cause sys / usr dont have a spsr)
+uint32_t* pspsr; // shorthand
 
 uint32_t op_pipe1;
 uint32_t op_pipe2;
@@ -220,7 +222,7 @@ void arm7_reset()
 
     cpsr = 0x1F;
     cpsr |= 0b100000;
-    arm7_update_gprs();
+    arm7_update_regs();
 
     for (int i = 0; i < 16; i++)
         *gprs[i] = 0;
@@ -233,7 +235,7 @@ void arm7_reset()
 }
 
 /* This function applies mode specific register mapping */
-void arm7_update_gprs()
+void arm7_update_regs()
 {
     switch (cpsr & 0x1F) // which mode?
     {
@@ -245,6 +247,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13;
         gprs[14] = &r14;
+        pspsr = &spsr_dummy;
         break;
     case 0x11: // fiq
         gprs[8] = &r8_fiq;
@@ -254,6 +257,7 @@ void arm7_update_gprs()
         gprs[12] = &r12_fiq;
         gprs[13] = &r13_fiq;
         gprs[14] = &r14_fiq;
+        pspsr = &spsr_fiq;
         break;
     case 0x12: // irq
         gprs[8] = &r8;
@@ -263,6 +267,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13_irq;
         gprs[14] = &r14_irq;
+        pspsr = &spsr_irq;
         break;
     case 0x13: // supervisor (swi)
         gprs[8] = &r8;
@@ -272,6 +277,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13_svc;
         gprs[14] = &r14_svc;
+        pspsr = &spsr_svc;
         break;
     case 0x17: // abort
         gprs[8] = &r8;
@@ -281,6 +287,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13_abt;
         gprs[14] = &r14_abt;
+        pspsr = &spsr_abt;
         break;
     case 0x1B: // undefined
         gprs[8] = &r8;
@@ -290,6 +297,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13_und;
         gprs[14] = &r14_und;
+        pspsr = &spsr_und;
         break;
     case 0x1F: // system
         gprs[8] = &r8;
@@ -299,6 +307,7 @@ void arm7_update_gprs()
         gprs[12] = &r12;
         gprs[13] = &r13;
         gprs[14] = &r14;
+        pspsr = &spsr_dummy;
         break;
     default:
         // throw cpu exception?
@@ -817,7 +826,7 @@ void arm7_execute_thumb(uint32_t opcode)
         cpsr &= 0xFFFFFFDF;
         cpsr &= 0xFFFFFFE0;
         cpsr |= 0x13;
-        arm7_update_gprs();
+        arm7_update_regs();
         branched = true;
         pipe_state = 0;
     } else if ((op & 0xF800) == 0xE000) { // b label
@@ -1086,6 +1095,8 @@ void arm7_execute(uint32_t op)
         		bool_carry(tmp_carry);
         		break;
         	}
+        } else if ((op & 0x0FBF0FFF) == 0x010F0000) { // MSR (transfer PSR contents to a register)
+        	
         }
     }
         
