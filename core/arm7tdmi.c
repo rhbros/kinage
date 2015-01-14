@@ -940,7 +940,7 @@ void arm7_execute(uint32_t op)
         		}
         	} else { // nope..
         		uint32_t imm = op & 0xFF;
-        		uint32_t amount = (op >> 8) & 0xF;
+        		uint32_t amount = ((op >> 8) & 0xF) << 1;
         		if (amount != 0) 
         		{
         			tmp_carry = (imm >> (amount - 1)) & 1;
