@@ -902,8 +902,10 @@ void arm7_execute(uint32_t op)
         	bool alter_cond = op & (1 << 20);
         	bool tmp_carry = cpsr & FLAG_CARRY; // temporary storage for shifter carry result.
         	
+        	printf("DEBUG: Data Processing @ %x\n\n", r15);
+        	
         	// calculate operand2
-        	if (op & (1 << 25)) // is operand2 immediate?
+        	if ((op & (1 << 25)) == 0) // is operand2 shifted register?
         	{
         		uint32_t rm = op & 0xF;
         		uint32_t shift = (op >> 4) & 0xFF;
