@@ -846,7 +846,7 @@ void arm7_execute_thumb(uint32_t opcode)
 
 void arm7_execute(uint32_t op)
 {
-    uint32_t pc = r15 - 8;
+    //uint32_t pc = r15 - 8;
     bool cond_given = false;
 
     switch (op >> 28)
@@ -871,28 +871,178 @@ void arm7_execute(uint32_t op)
 
     if (cond_given)
     {
-        if ((op & 0xFFFFFF0) == 0x12FFF10) { // branch with exchange
-            uint32_t rn = op & 0xF;
-            if (!(reg(rn) & 1))
-            {
-                cpsr &= 0xFFFFFFDF;
-                r15 = reg(rn) & 0xFFFFFFFC;
-            } else {
-                r15 = reg(rn) & 0xFFFFFFFE;
-            }
-            pipe_state = 0; // Clear the pipeline!!!!111elf
-            branched = true;
-        } else if ((op & 0xE000000) == 0xA000000) { // branch / branch with link
-            uint32_t offset = op & 0xFFFFFF;
-            if ((offset & 0x800000) == 0x800000)
-            {
-                offset |= 0xFF000000;
-            }
-            if ((op & 0x1000000) == 0x1000000) // if branch with link
-            {
-                reg(14) = r15 - 4;
-            }
-            r15 += offset << 2;
+        if ((op & 0x0FFFFFF0) == 0x012FFF10) { // Branch and Exchange (BX)
+        	uint32_t rn = op & 0xF;
+        	if (reg(rn) & 1) // if mode switch to thumb
+        	{
+        		cpsr |= 0b100000;
+        		r15 = reg(rn) & ~(1);
+        	} else { // stay in arm mode
+        		r15 = reg(rn) & ~(3);
+        	}
+        	// check if pipe is really flushed?
+        	pipe_state = 0;
+        	branched = true;
+        } else if ((op & 0x0E000000) == 0x0A000000) { // Branch and Branch with Link
+        	uint32_t offset = op & 0xFFFFFF;
+        	if (offset & 0x800000) // check if sign extend is needed
+        	{
+        		offset |= 0xFF000000;
+        	}
+        	if (op & 0x01000000) { // with link
+        		reg(14) = r15 - 4;
+        	}
+        	r15 += offset << 2;
+        	pipe_state = 0;
+        	branched = true;
+        } else if (((op & 0x0E000000) == 0 && (op & 0x90) != 0x90) || ((op & 0x0E000000) == 0x02000000)) { // Data Processing (optimize this...) (check correctness of condition)
+        	uint32_t rd = (op >> 12) & 0xF;
+        	uint32_t rn = (op >> 16) & 0xF;
+        	uint32_t op2;
+        	bool alter_cond = op & (1 << 20);
+        	bool tmp_carry = cpsr & FLAG_CARRY; // temporary storage for shifter carry result.
+        	
+        	// calculate operand2
+        	if (op & (1 << 25)) // is operand2 immediate?
+        	{
+        		uint32_t rm = op & 0xF;
+        		uint32_t shift = (op >> 4) & 0xFF;
+        		uint32_t amount;
+        		int32_t result;
+        		if (shift & 1) amount = reg(shift >> 4);
+        			else amount = shift >> 3;
+        		if (amount != 0)
+        		{
+		    		switch ((shift >> 1) & 3)
+		    		{
+		    		case 0b00: // LSL
+		    			tmp_carry = (reg(rm) << (amount - 1)) & 0x80000000;
+		    			op2 = reg(rm) << amount; 
+		    			break;
+		    		case 0b01: // LSR
+		    			tmp_carry = (reg(rm) >> (amount - 1)) & 1;
+		    			op2 = reg(rm) >> amount;
+		    			break;
+		    		case 0b10: // ASR
+		    			result = (int32_t)(reg(rm)) >> (int32_t)amount;
+		    			tmp_carry = (reg(rm) >> (amount - 1)) & 1;
+		    			op2 = (uint32_t)result;
+		    			break;
+		    		case 0b11: // ROR 
+		    			tmp_carry = (reg(rm) >> (amount - 1)) & 1;
+		    			op2 = (reg(rm) << (32 - amount)) | (reg(rm) >> amount);
+		    			break;
+		    		}
+        		} else {
+        			op2 = reg(rm);
+        		}
+        	} else { // nope..
+        		uint32_t imm = op & 0xFF;
+        		uint32_t amount = (op >> 8) & 0xF;
+        		if (amount != 0) 
+        		{
+        			tmp_carry = (imm >> (amount - 1)) & 1;
+        			op2 = (imm << (32 - amount)) | (imm >> amount); // is this correct way? duh..
+        		} else {
+        			op2 = imm;
+        		}
+        	}
+        	
+        	// opcode switch
+        	uint32_t result2;
+        	switch ((op >> 21) & 0xF)
+        	{
+        	case 0b0000: // AND
+        		reg(rd) = reg(rn) & op2;
+        		if (alter_cond)
+        		{
+        			update_sign(reg(rn));
+        			update_zero(reg(rn));
+        			bool_carry(tmp_carry);
+        		}
+        		break;
+        	case 0b0001: // EOR
+        		reg(rd) = reg(rn) ^ op2;
+        		if (alter_cond)
+        		{
+        			update_sign(reg(rn));
+        			update_zero(reg(rn));
+        			bool_carry(tmp_carry);
+        		}
+        		break;
+        	case 0b0010: // SUB
+        		if (alter_cond)
+        		{
+    				//...
+        		} else {
+        			reg(rd) = reg(rn) - op2;
+        		}
+        		break;
+        	case 0b0011: // RSB
+        		if (alter_cond)
+        		{
+        			//...
+        		} else {
+        			reg(rd) = op2 - reg(rn);
+        		}
+        		break;
+        	case 0b0100: // ADD
+        		if (alter_cond)
+        		{
+        			//...
+        		} else {
+        			reg(rd) = reg(rn) + op2;
+        		}
+        		break;
+        	case 0b0101: // ADC
+        		if (alter_cond)
+        		{
+        			//...
+        		} else {
+        			reg(rd) = reg(rn) + op2 + CARRY;
+        		}
+        		break;
+        	case 0b0110: // SBC
+        		if (alter_cond)
+        		{
+        			//...
+        		} else {
+        			reg(rd) = reg(rn) - op2 + CARRY - 1;
+        		}
+        		break;
+        	case 0b0111: // RSC
+        		if (alter_cond)
+        		{
+        			//...
+        		} else {
+        			reg(rd) = op2 - reg(rn) + CARRY - 1;
+        		}
+        		break;
+        	case 0b1000: // TST
+        		result2 = reg(rn) & op2;
+        		update_sign(result2);
+        		update_zero(result2);
+        		bool_carry(tmp_carry);
+        		break;
+        	case 0b1001: // TEQ
+        		result2 = reg(rn) ^ op2;
+        		update_sign(result2);
+        		update_zero(result2);
+        		bool_carry(tmp_carry);
+        		break;
+        	case 0b1010: // CMP
+        		break;
+        	case 0b1011: // CMN
+        		break;
+        	case 0b1100: // ORR
+        		break;
+        	case 0b1101: // MOV
+        		break;
+        	case 0b1110: // BIC
+        		break;
+        	case 0b1111: // MVN
+        		break;
+        	}
         }
     }
         
