@@ -949,7 +949,6 @@ void arm7_execute(uint32_t op)
         	}
         	
         	// opcode switch
-        	uint32_t result2;
         	switch ((op >> 21) & 0xF)
         	{
         	case 0b0000: // AND
@@ -971,76 +970,118 @@ void arm7_execute(uint32_t op)
         		}
         		break;
         	case 0b0010: // SUB
+        	{
         		if (alter_cond)
         		{
-    				//...
+    				SUBS(rd, rn, op2);
         		} else {
         			reg(rd) = reg(rn) - op2;
         		}
         		break;
+        	}
         	case 0b0011: // RSB
+        	{
         		if (alter_cond)
         		{
-        			//...
+        			RSBS(rd, rn, op2);
         		} else {
         			reg(rd) = op2 - reg(rn);
         		}
         		break;
+        	}
         	case 0b0100: // ADD
+        	{
         		if (alter_cond)
         		{
-        			//...
+        			ADDS(rd, rn, op2);
         		} else {
         			reg(rd) = reg(rn) + op2;
         		}
         		break;
+        	}
         	case 0b0101: // ADC
+        	{
         		if (alter_cond)
         		{
-        			//...
+        			ADCS(rd, rn, op2);
         		} else {
         			reg(rd) = reg(rn) + op2 + CARRY;
         		}
         		break;
+        	}
         	case 0b0110: // SBC
+        	{
         		if (alter_cond)
         		{
-        			//...
+        			SBCS(rd, rn, op2);
         		} else {
         			reg(rd) = reg(rn) - op2 + CARRY - 1;
         		}
         		break;
+        	}
         	case 0b0111: // RSC
+        	{
         		if (alter_cond)
         		{
-        			//...
+        			SBCS(rd, op2, rn); // this is a little bit hacky.. maybe own macro definition?
         		} else {
         			reg(rd) = op2 - reg(rn) + CARRY - 1;
         		}
         		break;
+        	}
         	case 0b1000: // TST
-        		result2 = reg(rn) & op2;
-        		update_sign(result2);
-        		update_zero(result2);
+        	{
+        		uint32_t result = reg(rn) & op2;
+        		update_sign(result);
+        		update_zero(result);
         		bool_carry(tmp_carry);
         		break;
+        	}
         	case 0b1001: // TEQ
-        		result2 = reg(rn) ^ op2;
-        		update_sign(result2);
-        		update_zero(result2);
+        	{
+        		uint32_t result = reg(rn) ^ op2;
+        		update_sign(result);
+        		update_zero(result);
         		bool_carry(tmp_carry);
         		break;
+        	}
         	case 0b1010: // CMP
+        	{
+        		CMP(rn, op2);
         		break;
+        	}
         	case 0b1011: // CMN
+        	{
+        		CMN(rn, op2);
         		break;
+        	}
         	case 0b1100: // ORR
+        	{
+        		uint32_t result = reg(rn) | op2;
+        		update_sign(result);
+        		update_zero(result);
+        		bool_carry(tmp_carry);
         		break;
+        	}
         	case 0b1101: // MOV
+        		reg(rd) = op2;
+        		update_sign(op2);
+        		update_sign(op2);
+        		bool_carry(tmp_carry);
         		break;
         	case 0b1110: // BIC
+        	{
+        		uint32_t result = reg(rn) & ~(op2);
+        		update_sign(result);
+        		update_zero(result);
+        		bool_carry(tmp_carry);
         		break;
+        	}
         	case 0b1111: // MVN
+        		reg(rd) = ~(op2);
+        		update_sign(reg(rn));
+        		update_sign(reg(rn));
+        		bool_carry(tmp_carry);
         		break;
         	}
         }
@@ -1146,3 +1187,4 @@ void arm7_write(uint32_t ptr, uint32_t value)
 {
 	mmu_writeword(ptr, value);
 }
+
