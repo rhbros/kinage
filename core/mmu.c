@@ -5,6 +5,7 @@ int cycles;
 
 // TEST
 uint8_t wram[0x40000];
+uint8_t iram[0x8000];
 uint8_t pal[0x400];
 uint8_t vram[0x18000];
 uint8_t* rom;
@@ -24,6 +25,10 @@ void mmu_setup(char* rom)
 	banks[2].ptr = wram;
 	banks[2].read_width_attr = BANK_CAN_BYTE | BANK_CAN_HWORD | BANK_CAN_WORD;
 	banks[2].write_width_attr = BANK_CAN_BYTE | BANK_CAN_HWORD | BANK_CAN_WORD;
+	
+	banks[3].ptr = iram;
+	banks[3].read_width_attr = BANK_CAN_BYTE | BANK_CAN_HWORD | BANK_CAN_WORD;
+	banks[3].write_width_attr = BANK_CAN_BYTE | BANK_CAN_HWORD | BANK_CAN_WORD;
 	
 	banks[4].ptr = io;
 	banks[4].read_width_attr = BANK_CAN_BYTE | BANK_CAN_HWORD | BANK_CAN_WORD;
