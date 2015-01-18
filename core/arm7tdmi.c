@@ -893,7 +893,74 @@ void arm7_execute(uint32_t op)
 		// Single Data Transfer
 		case 0b010:
 		case 0b011:
+		{
+			uint32_t offset = op & 0xFFF;
+			uint32_t rd = (op >> 12) & 0xF;
+			uint32_t rn = (op >> 16) & 0xF;
+			bool write = op & (1 << 21);
+			bool add = op & (1 << 23);
+			bool pre = op & (1 << 24);
+			uint32_t tmp_base = reg(rn);
+			
+			// Decode shift if neccesary
+			if (op & (1 << 25))
+			{
+				uint32_t rm = op & 0xF;
+				uint32_t source;
+				
+				// Get shift source
+				if (op & (1 << 4)) source = reg((op >> 8) & 0xF);
+					else source = (op >> 7) & 0x1F;
+					
+				// Apply shift
+				switch ((op >> 5) & 3)
+				{
+				case 0: // Logical left
+					offset = reg(rm) << source;
+					break;
+				case 1: // Logical right
+					offset = reg(rm) >> source;
+					break;
+				case 2: // Arithmetic right
+				{
+					int32_t result = (int32_t)(reg(rm)) >> (int32_t)source;
+					offset = (uint32_t)result;
+					break;
+				}
+				case 3: // Rotate right
+					offset = (reg(rm) << (32 - source)) | (reg(rm) >> source);
+				}
+			}
+			
+			if (pre) // is pre indexing enabled?
+			{
+				if (add) tmp_base += offset;
+					else tmp_base -= offset;
+			}
+			
+			// load / store
+			if ((op & 0x500000) == 0b000) { // str
+				arm7_write(tmp_base, reg(rd));
+			} else if ((op & 0x500000) == 0b001) { // ldr
+				reg(rd) = arm7_read(tmp_base);
+			} else if ((op & 0x500000) == 0b100) { // strb
+				arm7_writeb(tmp_base, reg(rd) & 0xFF);
+			} else { // ldrb
+				reg(rd) = arm7_readb(tmp_base);
+			}
+			
+			if (!pre) // is post indexing enabled?
+			{
+				if (add) tmp_base += offset;
+					else tmp_base -= offset;
+			}
+			
+			// write base back if required
+			if (write)
+				reg(rn) = tmp_base;
+			
 			break;
+		}
 		// Block Data Transfer
 		case 0b100:
 			break;
@@ -909,7 +976,7 @@ void arm7_execute(uint32_t op)
 		case 0b111:
 			if ((op & (1 << 24))) // Software Interrupt
 			{
-		
+				
 			} else { // Coprocessor Data Operation, Coprocessor Register Transfer
 				// This can be ignored at the current state because
 				// we don't plan to integrate Z80 Coprocessor emulation.
