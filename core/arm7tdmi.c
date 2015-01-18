@@ -883,31 +883,39 @@ void arm7_execute(uint32_t op)
 
     if (cond_given)
     {
-        if ((op & 0x0FFFFFF0) == 0x012FFF10) { // Branch and Exchange (BX)
-        	uint32_t rn = op & 0xF;
-        	if (reg(rn) & 1) // if mode switch to thumb
-        	{
-        		cpsr |= 0b100000;
-        		r15 = reg(rn) & ~(1);
-        	} else { // stay in arm mode
-        		r15 = reg(rn) & ~(3);
-        	}
-        	// check if pipe is really flushed?
-        	pipe_state = 0;
-        	branched = true;
-        } else if ((op & 0x0E000000) == 0x0A000000) { // Branch and Branch with Link
-        	uint32_t offset = op & 0xFFFFFF;
-        	if (offset & 0x800000) // check if sign extend is needed
-        	{
-        		offset |= 0xFF000000;
-        	}
-        	if (op & 0x01000000) { // with link
-        		reg(14) = r15 - 4;
-        	}
-        	r15 += offset << 2;
-        	pipe_state = 0;
-        	branched = true;
-        } 
+        switch ((op >> 25) & 7) // check bits 25 - 27
+		{
+		case 0b000:
+	
+			break;
+		case 0b001: // Immediate Data Transfer or MSR (immediate to PSR)
+			break;
+		// Single Data Transfer
+		case 0b010:
+		case 0b011:
+			break;
+		// Block Data Transfer
+		case 0b100:
+			break;
+		// Branch / Branch with link
+		case 0b101:
+			break;
+		// Coprocessor Data Transfer
+		case 0b110:
+			// This can be ignored at the current state because
+			// we don't plan to integrate Z80 Coprocessor emulation.
+			break;
+		// Coprocessor Data Operation, Coprocessor Register Transfer and Software Interrupt
+		case 0b111:
+			if ((op & (1 << 24))) // Software Interrupt
+			{
+		
+			} else { // Coprocessor Data Operation, Coprocessor Register Transfer
+				// This can be ignored at the current state because
+				// we don't plan to integrate Z80 Coprocessor emulation.
+			}
+			break;
+		}
     }
         
     arm7_regdump();

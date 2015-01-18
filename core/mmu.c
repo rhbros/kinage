@@ -47,7 +47,7 @@ void mmu_setup(char* rom)
 	banks[8].write_width_attr = 0;
 }
 
-/* Maybe check for functions not going recursive in some cases? */
+/* Maybe check for functions not going infinite in some cases? */
 
 uint8_t mmu_readbyte(uint32_t address)
 {
