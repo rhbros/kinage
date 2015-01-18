@@ -963,7 +963,69 @@ void arm7_execute(uint32_t op)
 		}
 		// Block Data Transfer
 		case 0b100:
+		{
+			uint32_t reg_list = op & 0xFFFF;
+			uint32_t rn = (op >> 16) & 0xF;
+			uint32_t tmp_cpsr;
+			uint32_t tmp_base = reg(rn);
+			bool load = op & (1 << 20);
+			bool write = op & (1 << 21);
+			bool s_bit = op & (1 << 22);
+			bool add = op & (1 << 23);
+			bool pre = op & (1 << 24);
+			bool force_usr = s_bit && !(load && (op & (1 << 15)));
+			
+			// force user mode if needed
+			if (force_usr)
+			{
+				tmp_cpsr = cpsr;
+				cpsr = (cpsr & ~(0x1f)) | 0x10;
+				arm7_update_regs();
+			}
+			
+			// iterate through the array
+			for (int i = 15; i >= 0; i--)
+			{
+				if (reg_list & (1 << i))
+				{
+					// if pre indexing enabled
+					if (pre)
+					{
+						if (add) tmp_base += 4;
+							else tmp_base -= 4;
+					}
+					
+					// do actual load / store
+					if (load) 
+					{
+						arm7_write(tmp_base, reg(i));
+					} else {
+						reg(i) = arm7_read(tmp_base);
+						if ((s_bit && !force_usr) && (i == 15)) cpsr = *pspsr;
+					}
+					
+					// if post indexing enabled
+					if (!pre)
+					{
+						if (add) tmp_base += 4;
+							else tmp_base -= 4;
+					}
+				}
+			}
+			
+			// restore original mode if was switched
+			if (force_usr)
+			{
+				cpsr = tmp_cpsr;
+				arm7_update_regs();
+			}
+			
+			// write base back if required
+			if (write)
+				reg(rn) = tmp_base;
+				
 			break;
+		}
 		// Branch / Branch with link
 		case 0b101:
 			break;
