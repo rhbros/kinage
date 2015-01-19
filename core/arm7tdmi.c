@@ -1052,7 +1052,17 @@ void arm7_execute(uint32_t op)
 		case 0b111:
 			if ((op & (1 << 24))) // Software Interrupt
 			{
-				
+                reg(14) = r15 - 4; // save return address
+				r15 = 8; // let pc point to the fixed supervisor address;
+                spsr_svc = cpsr; // save the current status
+                
+                // update mode
+                cpsr = (cpsr & ~(0x1F)) | 0x13;
+                arm7_update_regs();
+
+                // fix / flush pipeline
+                branched = true;
+                pipe_state = 0;
 			} else { // Coprocessor Data Operation, Coprocessor Register Transfer
 				// This can be ignored at the current state because
 				// we don't plan to integrate Z80 Coprocessor emulation.

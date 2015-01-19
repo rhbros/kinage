@@ -18,15 +18,15 @@ typedef void (*mmu_write_hook_word)(uint32_t address, uint32_t value);
 
 typedef struct mmu_bank
 {
-        uint8_t* ptr; 				// where the bank lays in our real memory
+        uint8_t* ptr; 			// where the bank lays in our real memory
         uint8_t read_width_attr;  	// contains information about supported read sizes (8, 16, 32)
         uint8_t write_width_attr; 	// contains information about supported write sizes (8, 16, 32)
         uint8_t cycles_byte; 		// how many cycles it takes to access one byte
         uint8_t cycles_hword; 		// how many cycles it takes to access one hword
         uint8_t cycles_word; 		// how many cycles it takes to access one word
-        mmu_read_hook_byte read_hook_byte;		// optional function to be called when reading byte (original method will no longer write data itself)
+        mmu_read_hook_byte read_hook_byte;	// optional function to be called when reading byte (original method will no longer write data itself)
         mmu_read_hook_hword read_hook_hword;	// optional function to be called when reading hword (original method will no longer write data itself)
-        mmu_read_hook_word read_hook_word;		// optional function to be called when reading word (original method will no longer write data itself)
+        mmu_read_hook_word read_hook_word;	// optional function to be called when reading word (original method will no longer write data itself)
         mmu_write_hook_byte write_hook_byte;	// optional function to be called when writing byte (original method will no longer write data itself)
         mmu_write_hook_hword write_hook_hword;	// optional function to be called when writing hword (original method will no longer write data itself)
         mmu_write_hook_word write_hook_word;	// optional function to be called when writing word (original method will no longer write data itself)
