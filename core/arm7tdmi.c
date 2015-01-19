@@ -1028,8 +1028,22 @@ void arm7_execute(uint32_t op)
 		}
 		// Branch / Branch with link
 		case 0b101:
+        {
+            uint32_t shift = op & 0x00FFFFFF;
+
+            // sign extend
+            if (shift & 0x800000)
+                shift |= 0xFF000000;
+
+            // link?
+            if (op & (1 << 24))
+                reg(14) = r15 - 4;
+
+            r15 += shift << 2;
+
 			break;
-		// Coprocessor Data Transfer
+		}
+        // Coprocessor Data Transfer
 		case 0b110:
 			// This can be ignored at the current state because
 			// we don't plan to integrate Z80 Coprocessor emulation.
