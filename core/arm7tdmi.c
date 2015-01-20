@@ -450,8 +450,8 @@ void arm7_execute_thumb(uint32_t opcode)
         uint32_t rs = (op >> 3) & 7;
         if ( (reg(rd) & 0xFFFF0000) && (reg(rs) & 0xFFFF0000) ) // We can't do all at once since we would loose bits!
         {
-            uint64_t hi = ((reg(rd) & 0xFFFF0000) * reg(rd)) & 0xFFFFFFFF;
-            uint64_t lo = ((reg(rd) & 0x0000FFFF) * reg(rd)) & 0xFFFFFFFF;
+            uint64_t hi = ((reg(rd) & 0xFFFF0000) * reg(rs)) & 0xFFFFFFFF;
+            uint64_t lo = ((reg(rd) & 0x0000FFFF) * reg(rs)) & 0xFFFFFFFF;
             reg(rd) = (hi + lo) & 0xFFFFFFFF;
         } else {
             reg(rd) *= reg(rs);
