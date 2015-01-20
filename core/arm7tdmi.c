@@ -886,7 +886,7 @@ void arm7_execute(uint32_t op)
         switch ((op >> 25) & 7) // check bits 25 - 27
 		{
 		case 0b000:
-	
+            // problemkind..................! du kleiner hurensohn <3
 			break;
 		case 0b001: // Immediate Data Transfer or MSR (immediate to PSR)
 			break;
@@ -1047,10 +1047,11 @@ void arm7_execute(uint32_t op)
 		case 0b110:
 			// This can be ignored at the current state because
 			// we don't plan to integrate Z80 Coprocessor emulation.
+            WARNING("Coprocessor Data Transfer not implemented"); // Though log it
 			break;
 		// Coprocessor Data Operation, Coprocessor Register Transfer and Software Interrupt
 		case 0b111:
-			if ((op & (1 << 24))) // Software Interrupt
+			if (op & (1 << 24)) // Software Interrupt
 			{
                 reg(14) = r15 - 4; // save return address
 				r15 = 8; // let pc point to the fixed supervisor address;
@@ -1066,6 +1067,7 @@ void arm7_execute(uint32_t op)
 			} else { // Coprocessor Data Operation, Coprocessor Register Transfer
 				// This can be ignored at the current state because
 				// we don't plan to integrate Z80 Coprocessor emulation.
+                WARNING("Coprocessor Data Operation / Register Transfer not implemented"); // Though log it
 			}
 			break;
 		}
