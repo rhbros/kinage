@@ -10,9 +10,9 @@ You can compile with a simple
 ```
 make
 ```
-Keep in mind, that you need the SDL library.
+Keep in mind that you need the SDL library.
 
 # Screenshots
 
-<img src="http://i4.minus.com/i9njdL7RLtWJX.png"><br>
-<img src="http://i7.minus.com/ibkltFKaoJPDDw.png">
+<img src="http://fs1.directupload.net/images/150122/owdcgjd2.png"><br>
+<img src="http://fs1.directupload.net/images/150122/xkf3yt8x.png">
