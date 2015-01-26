@@ -229,12 +229,12 @@ void arm7_reset()
 
     pipe_state = 0;
 
-    //reg(0) = 0x08000109;
-    //reg(13) = 0x03007F00;
-    //r15 = 0x8000108;
-    reg(0) = 0x08000101;
+    reg(0) = 0x08000109;
     reg(13) = 0x03007F00;
-    r15 = 0x8000100;
+    r15 = 0x8000108;
+    //reg(0) = 0x08000101;
+    //reg(13) = 0x03007F00;
+    //r15 = 0x8000100;
 }
 
 /* This function applies mode specific register mapping */
@@ -851,7 +851,7 @@ void arm7_execute_thumb(uint32_t opcode)
         printf("Unknown instruction at PC=%x", r15 - 4);
 	}
 
-    arm7_regdump();
+    //arm7_regdump();
     //char test[1337];
     //gets(test);
 }
@@ -886,9 +886,64 @@ void arm7_execute(uint32_t op)
         switch ((op >> 25) & 7) // check bits 25 - 27
 		{
 		case 0b000:
-            // problemkind..................! du kleiner hurensohn <3
+            if ((op & 0x1FFFFF0) == 0x12FFF10) // Branch and Exchange
+            {
+                uint32_t rn = op & 0xF;
+                if (reg(rn) & 1) // if mode switch to thumb
+                {
+                    cpsr |= 0b100000;
+                    r15 = reg(rn) & ~(1);
+                } else {
+                    r15 = reg(rn) & ~(3);
+                }
+                pipe_state = 0;
+                branched = true;
+            } else if ((op & 0xF0) < 0b10010000) { // Data Processing / PSR
+                if ((op & 0xFBF0FFF) == 0x10F0080) // MRS (transfer PSR contents to a register)
+                {
+                    if (op & (1 << 22)) reg((op >> 12) & 0xF) = *pspsr;
+                        else reg((op >> 12) & 0xF) = cpsr;
+                } else if ((op & 0xFBFFFF0) == 0x129F000) { // MSR (transfer register contents to PSR)
+                    uint32_t rm = op & 0xF;
+                    if (op & (1 << 22))
+                    {
+                        *pspsr = reg(rm);
+                    } else {
+                        if ((cpsr & 0x1f) == 0x10) cpsr = (cpsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
+                            else cpsr = reg(rm);
+                    }
+                } else if ((op & 0xFBFFFF0) == 0x128F000) { // MSR (transfer register contents to PSR flag bits only)
+                    uint32_t rm = op & 0xF;
+                    if (op & (1 << 22))
+                    {
+                        *pspsr = (*pspsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
+                    } else {
+                        cpsr = (cpsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
+                    }
+                } else { // Data Processing (operand2 is register)
+
+                }
+            } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
+
+            } else { // Halfword Data Transfer
+
+            }
 			break;
-		case 0b001: // Immediate Data Transfer or MSR (immediate to PSR)
+		case 0b001: // Immediate Data Transfer or MSR
+            if ((op & 0xFBFF000) == 0x328F000) // MSR (transfer immediate value to PSR flag bits only)
+            {
+                uint32_t imm = op & 0xFF;
+                uint32_t rotate = (op >> 8) & 0xF;
+                imm = (imm << (32 - rotate)) | (imm >> rotate);
+                if (op & (1 << 22))
+                {
+                    *pspsr = (*pspsr & 0x0FFFFFFF) | (imm & 0xF0000000);
+                } else {
+                    cpsr = (cpsr & 0x0FFFFFFF) | (imm & 0xF0000000);
+                }
+            } else { // Data Processing (operand2 is immediate)
+
+            }
 			break;
 		// Single Data Transfer
 		case 0b010:
