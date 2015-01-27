@@ -1397,11 +1397,11 @@ void arm7_execute(uint32_t op)
 			}
 			
 			// load / store
-			if ((op & 0x500000) == 0b000) { // str
+			if (((op & 0x500000) >> 20) == 0b000) { // str
 				arm7_write(tmp_base, reg(rd));
-			} else if ((op & 0x500000) == 0b001) { // ldr
+			} else if (((op & 0x500000) >> 20) == 0b001) { // ldr
 				reg(rd) = arm7_read(tmp_base);
-			} else if ((op & 0x500000) == 0b100) { // strb
+			} else if (((op & 0x500000) >> 20) == 0b100) { // strb
 				arm7_writeb(tmp_base, reg(rd) & 0xFF);
 			} else { // ldrb
 				reg(rd) = arm7_readb(tmp_base);
@@ -1432,6 +1432,8 @@ void arm7_execute(uint32_t op)
 			bool add = op & (1 << 23);
 			bool pre = op & (1 << 24);
 			bool force_usr = s_bit && !(load && (op & (1 << 15)));
+
+            NOTICE("BEFORE BLOCK");
 			
 			// force user mode if needed
 			if (force_usr)
@@ -1456,10 +1458,10 @@ void arm7_execute(uint32_t op)
 					// do actual load / store
 					if (load) 
 					{
-						arm7_write(tmp_base, reg(i));
+                        reg(i) = arm7_read(tmp_base);
+                        if ((s_bit && !force_usr) && (i == 15)) cpsr = *pspsr;
 					} else {
-						reg(i) = arm7_read(tmp_base);
-						if ((s_bit && !force_usr) && (i == 15)) cpsr = *pspsr;
+						arm7_write(tmp_base, reg(i));
 					}
 					
 					// if post indexing enabled
@@ -1481,6 +1483,8 @@ void arm7_execute(uint32_t op)
 			// write base back if required
 			if (write)
 				reg(rn) = tmp_base;
+
+            NOTICE("AFTER BLOCK");
 				
 			break;
 		}
