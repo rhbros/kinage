@@ -221,7 +221,7 @@ void arm7_reset()
     gprs[15] = &r15;
 
     cpsr = 0x1F;
-    cpsr |= 0b100000;
+    //cpsr |= 0b100000;
     arm7_update_regs();
 
     for (int i = 0; i < 16; i++)
@@ -229,12 +229,13 @@ void arm7_reset()
 
     pipe_state = 0;
 
-    reg(0) = 0x08000109;
-    reg(13) = 0x03007F00;
-    r15 = 0x8000108;
-    //reg(0) = 0x08000101;
+    //reg(0) = 0x08000109;
     //reg(13) = 0x03007F00;
-    //r15 = 0x8000100;
+    //r15 = 0x8000108;
+    ////reg(0) = 0x08000101;
+    ////reg(13) = 0x03007F00;
+    ////r15 = 0x8000100;
+    r15 = 0x08000000;
 }
 
 /* This function applies mode specific register mapping */
@@ -880,9 +881,10 @@ void arm7_execute(uint32_t op)
     case 0xE: cond_given = true; break;
     case 0xF: cond_given = false; break;
     }
-
+    NOTICE("ARM EXECUTION @ %x", r15 - 8);
     if (cond_given)
     {
+        NOTICE("CONDITION MET!");
         switch ((op >> 25) & 7) // check bits 25 - 27
 		{
 		case 0b000:
@@ -909,8 +911,13 @@ void arm7_execute(uint32_t op)
                     {
                         *pspsr = reg(rm);
                     } else {
-                        if ((cpsr & 0x1f) == 0x10) cpsr = (cpsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
-                            else cpsr = reg(rm);
+                        if ((cpsr & 0x1f) == 0x10) 
+                        {
+                            cpsr = (cpsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
+                        } else {
+                            cpsr = reg(rm);
+                            arm7_update_regs();
+                        }
                     }
                 } else if ((op & 0xFBFFFF0) == 0x128F000) { // MSR (transfer register contents to PSR flag bits only)
                     uint32_t rm = op & 0xF;
@@ -921,7 +928,219 @@ void arm7_execute(uint32_t op)
                         cpsr = (cpsr & 0x0FFFFFFF) | (reg(rm) & 0xF0000000);
                     }
                 } else { // Data Processing (operand2 is register)
+                    uint32_t op2 = reg(op & 0xF);
+                    uint32_t shift = (op >> 4) & 0xFF;
+                    uint32_t rd = (op >> 12) & 0xF;
+                    uint32_t rn = (op >> 16) & 0xF;
+                    uint32_t amount = 0;
+                    bool tmp_carry = (cpsr & FLAG_CARRY) == FLAG_CARRY;
+                    bool flags = op & (1 << 20);
 
+                    // decode amount
+                    if (shift & 1) amount = (reg((shift >> 4) & 0xF)) & 0xFF;
+                        else amount = (shift >> 3) & 0x1f;
+
+                    // apply shift to opcode2 if neccessary
+                    if (amount != 0)
+                    {
+                        switch ((shift >> 1) & 3)
+                        {
+                        case 0b00: // LSL
+                        {
+                            uint32_t result = op2 << amount;
+                            tmp_carry = (op2 << (amount - 1)) & 0x80000000;
+                            op2 = result;
+                            break;
+                        }
+                        case 0b01: // LSR
+                        {
+                            uint32_t result = op2 >> amount;
+                            tmp_carry = (op2 >> (amount - 1)) & 1;
+                            op2 = result;
+                            break; 
+                        }
+                        case 0b10: // ASR
+                        {
+                            int32_t result = (int32_t)op2 >> (int32_t)amount;
+                            tmp_carry = (op2 >> (amount - 1)) & 1;
+                            op2 = (uint32_t)result;
+                            break;
+                        }
+                        case 0b11: // ROR
+                        {
+                            uint32_t result = (op << (32 - amount)) | (op2 >> amount);
+                            tmp_carry = (op2 >> (amount - 1)) & 1;
+                            op2 = result;
+                            break;
+                        }
+                        }
+                    }
+
+                    // do the actual opcode magic
+                    switch ((op >> 21) & 0xF)
+                    {
+                    case 0b0000: // AND
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) & op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) & op2;
+                        }
+                        break;
+                    }
+                    case 0b0001: // EOR
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) ^ op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) ^ op2;
+                        }
+                        break;
+                    }
+                    case 0b0010: // SUB
+                    {
+                        if (flags)
+                        {
+                            SUBS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) - op2;
+                        }
+                        break;
+                    }
+                    case 0b0011: // RSB
+                    {
+                        if (flags)
+                        {
+                            RSBS(rd, rn, op2);
+                        } else {
+                            reg(rd) = op2 + reg(rn);
+                        }
+                        break;
+                    }
+                    case 0b0100: // ADD
+                    {
+                        if (flags)
+                        {
+                            ADDS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) + op2;
+                        }
+                        break;
+                    }
+                    case 0b0101: // ADC
+                    {
+                        if (flags)
+                        {
+                            ADCS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) + op2 + CARRY;
+                        }
+                        break;
+                    }
+                    case 0b0110: // SBC
+                    {
+                        if (flags)
+                        {
+                            SBCS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) - reg(op2) + CARRY - 1;
+                        }
+                        break;
+                    }
+                    case 0b0111: // RSC
+                    {
+                        if (flags)
+                        {
+                            RSBS(rd, rn, op - CARRY); // this is hacky... maybe write custom code?
+                        } else {
+                            reg(rd) = op - reg(rn) + CARRY - 1;
+                        }
+                        break;
+                    }
+                    case 0b1000: // TST
+                    {
+                        uint32_t result = reg(rn) & op2;
+                        update_sign(result);
+                        update_zero(result);
+                        break;
+                    }
+                    case 0b1001: // TEQ
+                    {
+                        uint32_t result = reg(rn) ^ op2;
+                        update_sign(result);
+                        update_zero(result);
+                        break;
+                    }
+                    case 0b1010: // CMP
+                    {
+                        CMP(rn, op2);
+                        break;
+                    }
+                    case 0b1011: // CMN
+                    {
+                        CMN(rn, op2);
+                        break;
+                    }
+                    case 0b1100: // ORR
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) | op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) | op2;
+                        }
+                        break;
+                    }
+                    case 0b1101: // MOV
+                    {
+                        if (flags) 
+                        {
+                            update_sign(op2);
+                            update_zero(op2);
+                            bool_carry(tmp_carry);
+                        }
+                        reg(rd) = op2;
+                        break;
+                    }
+                    case 0b1110: // BIC
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) & ~(op2);
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) & ~(op2);
+                        }
+                        break;
+                    }
+                    case 0b1111: // MVN
+                    {
+                        if (flags) 
+                        {
+                            update_sign(~(op2));
+                            update_zero(~(op2));
+                            bool_carry(tmp_carry);
+                        }
+                        reg(rd) = ~(op2);
+                    }
+                    }
                 }
             } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
 
@@ -942,7 +1161,191 @@ void arm7_execute(uint32_t op)
                     cpsr = (cpsr & 0x0FFFFFFF) | (imm & 0xF0000000);
                 }
             } else { // Data Processing (operand2 is immediate)
+                    uint32_t op2 = op & 0xFF;
+                    uint32_t shift = (op >> 4) & 0xFF;
+                    uint32_t rd = (op >> 12) & 0xF;
+                    uint32_t rn = (op >> 16) & 0xF;
+                    bool tmp_carry = (cpsr & FLAG_CARRY) == FLAG_CARRY;
+                    bool flags = op & (1 << 20);
 
+                    // 32-bit extend operand2
+                    if (op2 & 0x80) op2 |= 0xFFFFFF00;
+
+                    // do rotate right
+                    int rotate = ((op >> 8) & 0xF) << 2;
+                    if (rotate != 0)
+                    {
+                        uint32_t result = (op2 << (32 - rotate)) | (op2 >> rotate);
+                        tmp_carry = (result >> (rotate - 1)) & 1;
+                        op2 = result;
+                    }
+
+                    // do the actual opcode magic
+                    switch ((op >> 21) & 0xF)
+                    {
+                    case 0b0000: // AND
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) & op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) & op2;
+                        }
+                        break;
+                    }
+                    case 0b0001: // EOR
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) ^ op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) ^ op2;
+                        }
+                        break;
+                    }
+                    case 0b0010: // SUB
+                    {
+                        if (flags)
+                        {
+                            SUBS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) - op2;
+                        }
+                        break;
+                    }
+                    case 0b0011: // RSB
+                    {
+                        if (flags)
+                        {
+                            RSBS(rd, rn, op2);
+                        } else {
+                            reg(rd) = op2 + reg(rn);
+                        }
+                        break;
+                    }
+                    case 0b0100: // ADD
+                    {
+                        if (flags)
+                        {
+                            ADDS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) + op2;
+                        }
+                        break;
+                    }
+                    case 0b0101: // ADC
+                    {
+                        if (flags)
+                        {
+                            ADCS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) + op2 + CARRY;
+                        }
+                        break;
+                    }
+                    case 0b0110: // SBC
+                    {
+                        if (flags)
+                        {
+                            SBCS(rd, rn, op2);
+                        } else {
+                            reg(rd) = reg(rn) - reg(op2) + CARRY - 1;
+                        }
+                        break;
+                    }
+                    case 0b0111: // RSC
+                    {
+                        if (flags)
+                        {
+                            RSBS(rd, rn, op - CARRY); // this is hacky... maybe write custom code?
+                        } else {
+                            reg(rd) = op - reg(rn) + CARRY - 1;
+                        }
+                        break;
+                    }
+                    case 0b1000: // TST
+                    {
+                        uint32_t result = reg(rn) & op2;
+                        update_sign(result);
+                        update_zero(result);
+                        break;
+                    }
+                    case 0b1001: // TEQ
+                    {
+                        uint32_t result = reg(rn) ^ op2;
+                        update_sign(result);
+                        update_zero(result);
+                        break;
+                    }
+                    case 0b1010: // CMP
+                    {
+                        CMP(rn, op2);
+                        break;
+                    }
+                    case 0b1011: // CMN
+                    {
+                        CMN(rn, op2);
+                        break;
+                    }
+                    case 0b1100: // ORR
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) | op2;
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) | op2;
+                        }
+                        break;
+                    }
+                    case 0b1101: // MOV
+                    {
+                        if (flags) 
+                        {
+                            update_sign(op2);
+                            update_zero(op2);
+                            bool_carry(tmp_carry);
+                        }
+                        reg(rd) = op2;
+                        break;
+                    }
+                    case 0b1110: // BIC
+                    {
+                        if (flags)
+                        {
+                            uint32_t result = reg(rn) & ~(op2);
+                            update_sign(result);
+                            update_zero(result);
+                            bool_carry(tmp_carry);
+                            reg(rd) = result;
+                        } else {
+                            reg(rd) = reg(rn) & ~(op2);
+                        }
+                        break;
+                    }
+                    case 0b1111: // MVN
+                    {
+                        if (flags) 
+                        {
+                            update_sign(~(op2));
+                            update_zero(~(op2));
+                            bool_carry(tmp_carry);
+                        }
+                        reg(rd) = ~(op2);
+                        break;
+                    }
+                    }
             }
 			break;
 		// Single Data Transfer
@@ -1095,6 +1498,9 @@ void arm7_execute(uint32_t op)
                 reg(14) = r15 - 4;
 
             r15 += shift << 2;
+
+            pipe_state = 0;
+            branched = true;
 
 			break;
 		}
