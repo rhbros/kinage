@@ -1139,13 +1139,14 @@ void arm7_execute(uint32_t op)
                             bool_carry(tmp_carry);
                         }
                         reg(rd) = ~(op2);
+                        break;
                     }
                     }
                 }
             } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
-
+                ERROR("Multiply (Long) / Data Swap not implemented");
             } else { // Halfword Data Transfer
-
+                ERROR("Halfword Data Transfer not implemented");
             }
 			break;
 		case 0b001: // Immediate Data Transfer or MSR
@@ -1422,70 +1423,119 @@ void arm7_execute(uint32_t op)
 		// Block Data Transfer
 		case 0b100:
 		{
-			uint32_t reg_list = op & 0xFFFF;
-			uint32_t rn = (op >> 16) & 0xF;
-			uint32_t tmp_cpsr;
-			uint32_t tmp_base = reg(rn);
-			bool load = op & (1 << 20);
-			bool write = op & (1 << 21);
-			bool s_bit = op & (1 << 22);
-			bool add = op & (1 << 23);
-			bool pre = op & (1 << 24);
-			bool force_usr = s_bit && !(load && (op & (1 << 15)));
+            uint32_t reg_list = op & 0xFFFF;
+            uint32_t rn = (op >> 16) & 0xF;
+            bool load_bit = op & (1 << 20);
+            bool write_bit = op & (1 << 21);
+            bool psr_bit = op & (1 << 22);
+            bool add_bit = op & (1 << 23);
+            bool pre_bit = op & (1 << 24);
+            bool r15_bit = op & (1 << 15);
+            uint32_t tmp_base = reg(rn);
+            uint32_t tmp_cpsr = cpsr;
 
-            NOTICE("BEFORE BLOCK");
-			
-			// force user mode if needed
-			if (force_usr)
-			{
-				tmp_cpsr = cpsr;
-				cpsr = (cpsr & ~(0x1f)) | 0x10;
-				arm7_update_regs();
-			}
-			
-			// iterate through the array
-			for (int i = 15; i >= 0; i--)
-			{
-				if (reg_list & (1 << i))
-				{
-					// if pre indexing enabled
-					if (pre)
-					{
-						if (add) tmp_base += 4;
-							else tmp_base -= 4;
-					}
-					
-					// do actual load / store
-					if (load) 
-					{
+            // apply psr bit handling
+            if (psr_bit)
+            {
+                if (load_bit && r15_bit)
+                {
+                    // copy spsr_<cur> to cpsr and update regs
+                    cpsr = *pspsr;
+                    arm7_update_regs();
+                } else {
+                    // switch cpu temporary to user mode
+                    cpsr = (cpsr & ~(0x1f)) | 0x10;
+                    arm7_update_regs();
+                }
+            }
+
+            // do actual loads / stores
+            if (!load_bit && !pre_bit && !add_bit) // post-decrement store (stmed)
+            {
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        arm7_write(tmp_base, reg(i));
+                        tmp_base -= 4;
+                    }
+                }
+            } else if (!load_bit && pre_bit && !add_bit) { // pre-decrement store (stmfd)
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        tmp_base -= 4;
+                        arm7_write(tmp_base, reg(i));
+                    }
+                }
+            } else if (!load_bit && !pre_bit && add_bit) { // post-increment store (stmea)
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        arm7_write(tmp_base, reg(i));
+                        tmp_base += 4;
+                    }
+                }
+            } else if (!load_bit && pre_bit && add_bit) { // pre-increment store (stmfa)
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        tmp_base += 4;
+                        arm7_write(tmp_base, reg(i));
+                    }
+                }
+            } else if (load_bit && !pre_bit && !add_bit) { // post-decrement load (ldmfa)
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
                         reg(i) = arm7_read(tmp_base);
-                        if ((s_bit && !force_usr) && (i == 15)) cpsr = *pspsr;
-					} else {
-						arm7_write(tmp_base, reg(i));
-					}
-					
-					// if post indexing enabled
-					if (!pre)
-					{
-						if (add) tmp_base += 4;
-							else tmp_base -= 4;
-					}
-				}
-			}
-			
-			// restore original mode if was switched
-			if (force_usr)
-			{
-				cpsr = tmp_cpsr;
-				arm7_update_regs();
-			}
-			
-			// write base back if required
-			if (write)
-				reg(rn) = tmp_base;
+                        tmp_base -= 4;
+                    }
+                }
+            } else if (load_bit && pre_bit && !add_bit) { // pre-decrement load
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        tmp_base -= 4;
+                        reg(i) = arm7_read(tmp_base);
+                    }
+                }
+            } else if (load_bit && !pre_bit && add_bit) { // post-increment load
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        reg(i) = arm7_read(tmp_base);
+                        tmp_base += 4;
+                    }
+                }
+            } else { // pre-increment load
+                for (int i = 15; i >= 0; i--)
+                {
+                    if (reg_list & (1 << i))
+                    {
+                        tmp_base += 4;
+                        reg(i) = arm7_read(tmp_base);
+                    }
+                }
+            }
 
-            NOTICE("AFTER BLOCK");
-				
+            // if cpu mode was temporary changed to user mode
+            if (psr_bit && !(load_bit && r15_bit))
+            {
+                // restore original cpu mode
+                cpsr = tmp_cpsr;
+                arm7_update_regs();
+            }
+
+            // write base back if required
+            if (write_bit)
+                reg(rn) = tmp_base;
 			break;
 		}
 		// Branch / Branch with link
