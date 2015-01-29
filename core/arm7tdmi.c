@@ -1142,6 +1142,20 @@ void arm7_execute(uint32_t op)
                         break;
                     }
                     }
+
+                    // r15 specific stuff
+                    if (rd == 15)
+                    {
+                        // flush pipeline
+                        pipe_state = 0;
+                        branched = true;
+                        // mode switch if s bit set
+                        if (flags)
+                        {
+                            cpsr = *pspsr;
+                            arm7_update_regs();
+                        }
+                    }
                 }
             } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
                 ERROR("Multiply (Long) / Data Swap not implemented");
@@ -1173,7 +1187,7 @@ void arm7_execute(uint32_t op)
                     if (op2 & 0x80) op2 |= 0xFFFFFF00;
 
                     // do rotate right
-                    int rotate = ((op >> 8) & 0xF) << 2;
+                    int rotate = ((op >> 8) & 0xF) << 1;
                     if (rotate != 0)
                     {
                         uint32_t result = (op2 << (32 - rotate)) | (op2 >> rotate);
@@ -1347,6 +1361,20 @@ void arm7_execute(uint32_t op)
                         break;
                     }
                     }
+
+                    // r15 specific stuff
+                    if (rd == 15)
+                    {
+                        // flush pipeline
+                        pipe_state = 0;
+                        branched = true;
+                        // mode switch if s bit set
+                        if (flags)
+                        {
+                            cpsr = *pspsr;
+                            arm7_update_regs();
+                        }
+                    }
             }
 			break;
 		// Single Data Transfer
@@ -1360,6 +1388,7 @@ void arm7_execute(uint32_t op)
 			bool add = op & (1 << 23);
 			bool pre = op & (1 << 24);
 			uint32_t tmp_base = reg(rn);
+            bool load = false;
 			
 			// Decode shift if neccesary
 			if (op & (1 << 25))
@@ -1402,10 +1431,12 @@ void arm7_execute(uint32_t op)
 				arm7_write(tmp_base, reg(rd));
 			} else if (((op & 0x500000) >> 20) == 0b001) { // ldr
 				reg(rd) = arm7_read(tmp_base);
+                load = true;
 			} else if (((op & 0x500000) >> 20) == 0b100) { // strb
 				arm7_writeb(tmp_base, reg(rd) & 0xFF);
 			} else { // ldrb
 				reg(rd) = arm7_readb(tmp_base);
+                load = true;
 			}
 			
 			if (!pre) // is post indexing enabled?
@@ -1417,6 +1448,13 @@ void arm7_execute(uint32_t op)
 			// write base back if required
 			if (write)
 				reg(rn) = tmp_base;
+
+            // flush pipe if neccessary
+            if (load && rd == 15)
+            {
+                pipe_state = 0;
+                branched = true;
+            }
 			
 			break;
 		}
@@ -1433,6 +1471,8 @@ void arm7_execute(uint32_t op)
             bool r15_bit = op & (1 << 15);
             uint32_t tmp_base = reg(rn);
             uint32_t tmp_cpsr = cpsr;
+
+            NOTICE("BEGIN BLOCK DATA TRANSFER");
 
             // apply psr bit handling
             if (psr_bit)
@@ -1533,9 +1573,17 @@ void arm7_execute(uint32_t op)
                 arm7_update_regs();
             }
 
+            // flush pipe if r15 was written
+            if (load_bit && r15_bit)
+            {
+                pipe_state = 0;
+                branched = true;
+            }
+
             // write base back if required
             if (write_bit)
                 reg(rn) = tmp_base;
+            NOTICE("END BLOCK DATA TRANSFER");
 			break;
 		}
 		// Branch / Branch with link
