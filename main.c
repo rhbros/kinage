@@ -72,9 +72,19 @@ int main(int argc, char** argv)
 
     while (running)
     {
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < 10000000; i++)
             arm7_step();
-        for (int y = 0; y < 20; y++)
+        //ERROR("Drawing")
+        for (int y = 0; y < 160; y++)
+        {
+            for (int x = 0; x < 240; x++)
+            {
+                uint32_t color = arm7_readb(0x06000000 + y * 240 + x);
+                uint32_t argb = getcolor(color & 0xF, color >> 4);
+                setpixel(x, y, argb);
+            }
+        }
+        /*for (int y = 0; y < 20; y++)
         {
             for (int x = 0; x < 30; x++)
             {
@@ -83,7 +93,7 @@ int main(int argc, char** argv)
                 uint32_t t = v & 0xFF;
                 drawtile(x * 8, y * 8, t, p);
             }
-        }
+        }*/
 
         while (SDL_PollEvent(&event))
         {

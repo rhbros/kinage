@@ -884,7 +884,7 @@ void arm7_execute(uint32_t op)
     NOTICE("ARM EXECUTION @ %x", r15 - 8);
     if (cond_given)
     {
-        NOTICE("CONDITION MET!");
+        //NOTICE("CONDITION MET!");
         switch ((op >> 25) & 7) // check bits 25 - 27
 		{
 		case 0b000:
@@ -1158,9 +1158,105 @@ void arm7_execute(uint32_t op)
                     }
                 }
             } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
-                ERROR("Multiply (Long) / Data Swap not implemented");
+                ERROR("Multiply (Long) / Single Data Swap not implemented");
+                char test[1337];
+                gets(test);
             } else { // Halfword Data Transfer
-                ERROR("Halfword Data Transfer not implemented");
+                uint32_t sh = (op >> 5) & 3;
+                uint32_t rd = (op >> 12) & 0xF;
+                uint32_t rn = (op >> 16) & 0xF;
+                bool load_bit = op & (1 << 20);
+                bool write_bit = op & (1 << 21);
+                bool immediate_bit = op & (1 << 22);
+                bool add_bit = op & (1 << 23);
+                bool pre_bit = op & (1 << 24);
+                uint32_t tmp_base = reg(rn);
+
+                if (pre_bit)
+                {
+                    if (immediate_bit)
+                    {
+                        uint32_t offset = ((op >> 4) & 0xF0) | (op & 0xF);
+                        if (add_bit) tmp_base += offset;
+                            else tmp_base -= offset;
+                    } else {
+                        uint32_t rm = op & 0xF;
+                        if (add_bit) tmp_base += reg(rm);
+                            else tmp_base -= reg(rm);
+                    }
+                }
+
+                if (!load_bit)
+                NOTICE("0x%x = 0x%x", tmp_base, reg(rd));
+
+                switch (sh)
+                {
+                case 0b01:
+                {
+                    if (load_bit) reg(rd) = arm7_readh(tmp_base);
+                        else arm7_writeh(tmp_base, reg(rd));
+                    break;
+                }
+                case 0b10:
+                {
+                    if (load_bit)
+                    {
+                        uint32_t value = arm7_readb(tmp_base);
+                        if (value & 0x80) value |= 0xFFFFFF00;
+                        reg(rd) = value;
+                    } else {
+                        uint32_t value = reg(rd);
+                        if (value & 0x80) value |= 0xFFFFFF00;
+                        arm7_write(tmp_base, value);
+                    }
+                    break;
+                }
+                case 0b11:
+                {
+                    if (load_bit)
+                    {
+                        uint32_t value = arm7_readh(tmp_base);
+                        if (value & 0x8000) value |= 0xFFFF0000;
+                        reg(rd) = value;
+                    } else {
+                        uint32_t value = reg(rd);
+                        if (value & 0x8000) value |= 0xFFFF0000;
+                        arm7_write(tmp_base, value);
+                    }
+                    break;
+                }
+                default:
+                {
+                    ERROR("Undefined instruction");
+                }
+                }
+
+                if (!pre_bit)
+                {
+                    if (immediate_bit)
+                    {
+                        uint32_t offset = ((op >> 4) & 0xF0) | (op & 0xF);
+                        if (add_bit) tmp_base += offset;
+                            else tmp_base -= offset;
+                    } else {
+                        uint32_t rm = op & 0xF;
+                        if (add_bit) tmp_base += reg(rm);
+                            else tmp_base -= reg(rm);
+                    }
+                }
+
+                if (load_bit && rd == 15)
+                {
+                    pipe_state = 0;
+                    branched = true;
+                }
+
+                if (write_bit)
+                    reg(rn) = tmp_base;
+
+                //NOTICE("END HALFWORD TRANSFER");
+
+                //ERROR("Halfword Data Transfer not implemented");
             }
 			break;
 		case 0b001: // Immediate Data Transfer or MSR
@@ -1177,7 +1273,7 @@ void arm7_execute(uint32_t op)
                 }
             } else { // Data Processing (operand2 is immediate)
                     uint32_t op2 = op & 0xFF;
-                    uint32_t shift = (op >> 4) & 0xFF;
+                    //uint32_t shift = (op >> 4) & 0xFF;
                     uint32_t rd = (op >> 12) & 0xF;
                     uint32_t rn = (op >> 16) & 0xF;
                     bool tmp_carry = (cpsr & FLAG_CARRY) == FLAG_CARRY;
@@ -1472,7 +1568,7 @@ void arm7_execute(uint32_t op)
             uint32_t tmp_base = reg(rn);
             uint32_t tmp_cpsr = cpsr;
 
-            NOTICE("BEGIN BLOCK DATA TRANSFER");
+            //NOTICE("BEGIN BLOCK DATA TRANSFER");
 
             // apply psr bit handling
             if (psr_bit)
@@ -1583,7 +1679,7 @@ void arm7_execute(uint32_t op)
             // write base back if required
             if (write_bit)
                 reg(rn) = tmp_base;
-            NOTICE("END BLOCK DATA TRANSFER");
+            //NOTICE("END BLOCK DATA TRANSFER");
 			break;
 		}
 		// Branch / Branch with link
@@ -1637,8 +1733,8 @@ void arm7_execute(uint32_t op)
     }
         
     arm7_regdump();
-    char test[1337];
-    gets(test);
+    //char test[1337];
+    //gets(test);
 }
 
 /* Does next processor step */
