@@ -328,503 +328,386 @@ void arm7_regdump()
     printf("cpsr: %x\n", cpsr);
 }
 
-void arm7_execute_thumb(uint32_t opcode)
+void arm7_execute_thumb(uint32_t op)
 {
-    /* Execution logic goes here */
-	uint32_t op = opcode;
-    //printf("Opcode: %x\n", op);
-	if ((op & 0xF800) == 0x0) { // lsl rd, rs, imm5
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        LSL(rd, rs, imm5);
-    } else if ((op & 0xF800) == 0x800) { // lsr rd, rs, imm5
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        LSR(rd, rs, imm5);
-    } else if ((op & 0xF800) == 0x1000) { // asr rd, rs, imm5
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        ASR(rd, rs, imm5);
-    } else if ((op & 0xFE00) == 0x1800) { // add rd, rs, rn
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t rn = (op >> 6) & 7;
-        ADDS(rd, rs, reg(rn));
-    } else if ((op & 0xFE00) == 0x1A00) { // sub rd, rs, rn
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t rn = (op >> 6) & 7;
-        SUBS(rd, rs, reg(rn));
-    } else if ((op & 0xFE00) == 0x1C00) { // add rd, rs, imm3
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t imm3 = (op >> 6) & 7;
-        ADDS(rd, rs, imm3);
-    } else if ((op & 0xFE00) == 0x1E00) { // sub rd, rs, imm3
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t imm3 = (op >> 6) & 7;
-        SUBS(rd, rs, imm3);
-    } else if ((op & 0xF800) == 0x2000) { // mov rd, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        update_sign(false);
-        update_zero(imm8);
-        reg(rd) = imm8;
-    } else if ((op & 0xF800) == 0x2800) { // cmp rd, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        CMP(rd, imm8);
-    } else if ((op & 0xF800) == 0x3000) { // add rd, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        ADDS(rd, rd, imm8);
-    } else if ((op & 0xF800) == 0x3800) { // sub rd, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        SUBS(rd, rd, imm8);
-    } else if ((op & 0xFFC0) == 0x4000) { // and rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        reg(rd) &= reg(rs);
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-    } else if ((op & 0xFFC0) == 0x4040) { // eor rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        reg(rd) ^= reg(rs);
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-    } else if ((op & 0xFFC0) == 0x4080) { // lsl rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        LSL(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x40C0) { // lsr rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        LSR(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x4100) { // asr rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        ASR(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x4140) { // adc rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        ADCS(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x4180) { // sbc rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        SBCS(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x41C0) { // ror rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        ROR(rd, rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x4200) { // tst rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        uint32_t result = reg(rd) & reg(rs);
-        update_sign(result);
-        update_zero(result);
-    } else if ((op & 0xFFC0) == 0x4240) { // neg rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        RSBS(rd, rs, 0);
-    } else if ((op & 0xFFC0) == 0x4280) { // cmp rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        CMP(rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x42C0) { // cmn rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        CMN(rd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x4300) { // orr rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        reg(rd) |= reg(rs);
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-    } else if ((op & 0xFFC0) == 0x4340) { // mul rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        if ( (reg(rd) & 0xFFFF0000) && (reg(rs) & 0xFFFF0000) ) // We can't do all at once since we would loose bits!
-        {
-            uint64_t hi = ((reg(rd) & 0xFFFF0000) * reg(rs)) & 0xFFFFFFFF;
-            uint64_t lo = ((reg(rd) & 0x0000FFFF) * reg(rs)) & 0xFFFFFFFF;
-            reg(rd) = (hi + lo) & 0xFFFFFFFF;
-        } else {
-            reg(rd) *= reg(rs);
-        }
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-        bool_carry(false);
-    } else if ((op & 0xFFC0) == 0x4380) { // bic rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        reg(rd) &= ~(reg(rs));
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-    } else if ((op & 0xFFC0) == 0x43C0) { // mvn rd, rs
-        uint32_t rd = op & 7;
-        uint32_t rs = (op >> 3) & 7;
-        reg(rd) = ~(reg(rs));
-        update_sign(reg(rd));
-        update_zero(reg(rd));
-    } else if ((op & 0xFFC0) == 0x4440) { // add rd, hs
-        uint32_t rd = op & 7;
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        reg(rd) += reg(hs);
-    } else if ((op & 0xFFC0) == 0x4480) { // add hs, rs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t rs = (op >> 3) & 7;
-        reg(hd) += reg(rs);
-    } else if ((op & 0xFFC0) == 0x44C0) { // add hd, hs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        reg(hd) += reg(hs);
-    } else if ((op & 0xFFC0) == 0x4540) { // cmp rd, hs
-        uint32_t rd = op & 7;
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        CMP(rd, reg(hs));
-    } else if ((op & 0xFFC0) == 0x4580) { // cmp hd, rs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t rs = (op >> 3) & 7;
-        CMP(hd, reg(rs));
-    } else if ((op & 0xFFC0) == 0x45C0) { // cmp hd, hs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        CMP(hd, reg(hs));
-    } else if ((op & 0xFFC0) == 0x4640) { // mov rd, hs
-        uint32_t rd = op & 7;
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        reg(rd) = reg(hs);
-    } else if ((op & 0xFFC0) == 0x4680) { // mov hd, rs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t rs = (op >> 3) & 7;
-        reg(hd) = reg(rs);
-    } else if ((op & 0xFFC0) == 0x46C0) { // mov hd, hs
-        uint32_t hd = 8 + (op & 7);
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        reg(hd) = reg(hs);
-    } else if ((op & 0xFFC0) == 0x4700) { // bx rs
-        uint32_t rs = (op >> 3) & 7;
-        if (!(reg(rs) & 1))
-        {
-            cpsr &= 0xFFFFFFDF;
-            r15 = reg(rs) & 0xFFFFFFFC;
-        } else {
-            r15 = reg(rs) & 0xFFFFFFFE;
-        }
-        pipe_state = 0; // Clear the pipeline!!!!111elf
-        branched = true;
-    } else if ((op & 0xFFC0) == 0x4740) { // bx hs
-        uint32_t hs = 8 + ((op >> 3) & 7);
-        if (!(reg(hs) & 1))
-        {
-            cpsr &= 0xFFFFFFDF;
-            r15 = reg(hs) & 0xFFFFFFFC;
-        } else {
-            r15 = reg(hs) & 0xFFFFFFFE;
-        }
-        branched = true;
-        pipe_state = 0; // Clear the pipeline!!!!111elf
-    } else if ((op & 0xF800) == 0x4800) { // ldr rd, [r15, imm8]
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        reg(rd) = arm7_read(r15 + (imm8 << 2));
-    } else if ((op & 0xFE00) == 0x5000) { // str rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        arm7_write(reg(rb) + reg(ro), reg(rd));
-    } else if ((op & 0xFE00) == 0x5400) { // strb rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        arm7_writeb(reg(rb) + reg(ro), reg(rd) & 0xFF);
-    } else if ((op & 0xFE00) == 0x5800) { // ldr rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        reg(rd) = arm7_read(reg(rb) + reg(ro));
-    } else if ((op & 0xFE00) == 0x5C00) { // ldrb rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        reg(rd) = arm7_readb(reg(rb) + reg(ro));
-    } else if ((op & 0xFE00) == 0x5200) { // strh rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        arm7_writeh(reg(rb) + reg(ro), reg(rd));
-    } else if ((op & 0xFE00) == 0x5A00) { // ldrh rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        reg(rd) = arm7_readh(reg(rb) + reg(ro));
-    } else if ((op & 0xFE00) == 0x5600) { // ldsb rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        reg(rd) = arm7_readb(reg(rb) + reg(ro));
-        if (reg(rd) & 0x80)
-            reg(rd) |= 0xFFFFFF00;
-    } else if ((op & 0xFE00) == 0x5E00) { // ldsh rd, [rb, ro]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t ro = (op >> 6) & 7;
-        reg(rd) = arm7_readh(reg(rb) + reg(ro));
-        if (reg(rd) & 0x8000)
-            reg(rd) |= 0xFFFF0000;
-    } else if ((op & 0xF800) == 0x6000) { // str rd, [rb, imm5]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        arm7_write(reg(rb) + (imm5 << 2), reg(rd));
-    } else if ((op & 0xF800) == 0x6800) { // ldr rd, [rb, imm5]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        reg(rd) = arm7_read(reg(rb) + (imm5 << 2));
-    } else if ((op & 0xF800) == 0x7000) { // strb rd, [rb, imm5]
-        uint32_t rd = op & 7;
+	if ((op & 0xF800) < 0x1800) // THUMB.1 Move shifted register
+	{
+		uint32_t rd = op & 7;
+		uint32_t rs = (op >> 3) & 7;
+		uint32_t imm5 = (op >> 6) & 0x1F;
+		switch ((op >> 11) & 3)
+		{
+		case 0b00: // LSL
+			LSL(rd, rs, imm5);
+			break;
+		case 0b01: // LSR
+			LSR(rd, rs, imm5);
+			break;
+		case 0b10: // ASR
+			ASR(rd, rs, imm5);
+			break;
+		}
+	} else if ((op & 0xF800) == 0x1800) { // THUMB.2 Add/subtract
+		uint32_t rd = op & 7;
+		uint32_t rs = (op >> 3) & 7;
+		uint32_t field3 = (op >> 6) & 7;
+		switch ((op >> 9) & 3)
+		{
+		case 0b00: // ADD REG
+			ADDS(rd, rs, reg(field3));
+			break;
+		case 0b01: // SUB REG
+			SUBS(rd, rs, reg(field3));
+			break;
+		case 0b10: // ADD IMM
+			ADDS(rd, rs, field3);
+			break;
+		case 0b11: // SUB IMM
+			SUBS(rd, rs, field3);
+			break;
+		}
+	} else if ((op & 0xE000) == 0x2000) { // THUMB.3 Move/compare/add/subtract immediate
+		uint32_t imm8 = op & 0xFF;
+		uint32_t rd = (op >> 8) & 7;
+		switch ((op >> 11) & 3)
+		{
+		case 0b00: // MOV
+			update_sign(false);
+			update_zero(imm8);
+			reg(rd) = imm8;
+			break;
+		case 0b01: // CMP
+			CMP(rd, imm8);
+			break;
+		case 0b10: // ADD
+			ADDS(rd, rd, imm8);
+			break;
+		case 0b11: // SUB
+			SUBS(rd, rd, imm8);
+			break;
+		}
+	} else if ((op & 0xFC00) == 0x4000) { // THUMB.4 ALU operations
+		uint32_t rd = op & 7;
+		uint32_t rs = (op >> 3) & 7;
+		switch ((op >> 6) & 0xF)
+		{
+		case 0b0000: // AND
+			reg(rd) &= reg(rs);
+			update_sign(reg(rd));
+			update_zero(reg(rd));
+			break;
+		case 0b0001: // EOR
+			reg(rd) ^= reg(rs);
+			update_sign(reg(rd));
+			update_zero(reg(rd));
+			break;
+		case 0b0010: // LSL
+			LSL(rd, rd, reg(rs));
+			break;
+		case 0b0011: // LSR
+			LSR(rd, rd, reg(rs));
+			break;
+		case 0b0100: // ASR
+			ASR(rd, rd, reg(rs));
+			break;
+		case 0b0101: // ADC
+			ADCS(rd, rd, reg(rs));
+			break;
+		case 0b0110: // SBC
+			SBCS(rd, rd, reg(rs));
+			break;
+		case 0b0111: // ROR
+			ROR(rd, rd, reg(rs));
+			break;
+		case 0b1000: // TST
+		{
+			uint32_t result = reg(rd) & reg(rs);
+			update_sign(result);
+			update_zero(result);
+			break;
+		}
+		case 0b1001: // NEG
+			RSBS(rd, rs, 0); // kinda hacky
+			break;
+		case 0b1010: // CMP
+			CMP(rd, reg(rs));
+			break;
+		case 0b1011: // CMN
+			CMN(rd, reg(rs));
+			break;
+		case 0b1100: // ORR
+			reg(rd) |= reg(rs);
+			update_sign(reg(rd));
+			update_zero(reg(rd));
+			break;
+		case 0b1101: // MUL (check for correctnes)
+			if ( (reg(rd) & 0xFFFF0000) && (reg(rs) & 0xFFFF0000) ) // We can't do all at once since we would loose bits!
+	        {
+	            uint64_t hi = ((reg(rd) & 0xFFFF0000) * reg(rs)) & 0xFFFFFFFF;
+	            uint64_t lo = ((reg(rd) & 0x0000FFFF) * reg(rs)) & 0xFFFFFFFF;
+	            reg(rd) = (hi + lo) & 0xFFFFFFFF;
+	        } else {
+	            reg(rd) *= reg(rs);
+	        }
+	        update_sign(reg(rd));
+	        update_zero(reg(rd));
+	        bool_carry(false);
+			break;
+		case 0b1110: // BIC
+			reg(rd) &= ~(reg(rs));
+			update_sign(reg(rd));
+			update_zero(reg(rd));
+			break;
+		case 0b1111: // MVN
+			reg(rd) = ~(reg(rs));
+			update_sign(reg(rd));
+			update_zero(reg(rd));
+			break;
+		}
+	} else if ((op & 0xFC00) == 0x4400) { // THUMB.5 Hi register operations/branch exchange
+		uint32_t rdhd = op & 7;
+		uint32_t rshs = (op >> 3) & 7;
+		switch ((op >> 6) & 0xF)
+		{
+		case 0b0001: // ADD RD HS
+			reg(rdhd) += reg(rshs + 8);
+			break;
+		case 0b0010: // ADD HD RS
+			reg(rdhd + 8) += reg(rshs);
+			break;
+		case 0b0011: // ADD HD HS
+			reg(rdhd + 8) += reg(rshs + 8);
+			break;
+		case 0b0101: // CMP RD HS
+			CMP(rdhd, reg(rshs + 8));
+			break;
+		case 0b0110: // CMP HD RS
+			CMP(rdhd + 8, reg(rshs));
+			break;
+		case 0b0111: // CMP HD HS
+			CMP(rdhd + 8, reg(rshs + 8));
+			break;
+		case 0b1001: // MOV RD HS
+			reg(rdhd) = reg(rshs + 8);
+			break;
+		case 0b1010: // MOV HD RS
+			reg(rdhd + 8) = reg(rshs);
+			break;
+		case 0b1011: // MOV HD HS
+			reg(rdhd + 8) = reg(rshs + 8);
+			break;
+		case 0b1100: // BX RS
+			if (!(reg(rshs) & 1))
+	        {
+	            cpsr &= 0xFFFFFFDF;
+	            r15 = reg(rshs) & 0xFFFFFFFC;
+	        } else {
+	            r15 = reg(rshs) & 0xFFFFFFFE;
+	        }
+	        pipe_state = 0;
+	        branched = true;
+			break;
+		case 0b1101: // BX HS
+			if (!(reg(rshs + 8) & 1))
+	        {
+	            cpsr &= 0xFFFFFFDF;
+	            r15 = reg(rshs + 8) & 0xFFFFFFFC;
+	        } else {
+	            r15 = reg(rshs + 8) & 0xFFFFFFFE;
+	        }
+	        pipe_state = 0;
+	        branched = true;
+			break;
+		}
+	} else if ((op & 0xF800) == 0x4800) { // THUMB.6 PC-relative load
+		uint32_t imm8 = op & 0xFF;
+		uint32_t rd = (op >> 8) & 7;
+		reg(rd) = arm7_read(r15 + (imm8 << 2));
+	} else if ((op & 0xF200) == 0x5000) { // THUMB.7 Load/store with register offset
+		uint32_t rd = op & 7;
+		uint32_t rb = (op >> 3) & 7;
+		uint32_t ro = (op >> 6) & 7;
+		switch ((op >> 10) & 3)
+		{
+		case 0b00: // STR
+			arm7_write(reg(rb) + reg(ro), reg(rd));
+			break;
+		case 0b01: // STRB
+			arm7_writeb(reg(rb) + reg(ro), reg(rd) & 0xFF);
+			break;
+		case 0b10: // LDR
+			reg(rd) = arm7_read(reg(rb) + reg(ro));
+			break;
+		case 0b11: // LDRB	
+			reg(rd) = arm7_readb(reg(rb) + reg(ro));
+			break;
+		}
+	} else if ((op & 0xF200) == 0x5200) { // THUMB.8 Load/store sign-extended byte/halfword
+		uint32_t rd = op & 7;
+		uint32_t rb = (op >> 3) & 7;
+		uint32_t ro = (op >> 6) & 7;
+		switch ((op >> 10) & 3)
+		{
+		case 0b00: // STRH
+			arm7_writeh(reg(rb) + reg(ro), reg(rd));
+			break;	
+		case 0b01: // LDSB
+			reg(rd) = arm7_readb(reg(rb) + reg(ro));
+			if (reg(rd) & 0x80)
+				reg(rd) |= 0xFFFFFF00;
+			break;
+		case 0b10: // LDRH
+			reg(rd) = arm7_readh(reg(rb) + reg(ro));
+			break;
+		case 0b11: // LDSH
+			reg(rd) = arm7_readh(reg(rb) + reg(ro));
+			if (reg(rd) & 0x8000)
+				reg(rd) |= 0xFFFF0000;
+			break;
+		}
+	} else if ((op & 0xE000) == 0x6000) { // THUMB.9 Load store with immediate offset
+		uint32_t rd = op & 7;
+		uint32_t rb = (op >> 3) & 7;
+		uint32_t imm5 = (op >> 6) & 0x1F;
+		switch ((op >> 11) & 3)
+		{
+		case 0b00: // STR
+			arm7_write(reg(rb) + (imm5 << 2), reg(rd));
+			break;
+		case 0b01: // LDR
+			reg(rd) = arm7_read(reg(rb) + (imm5 << 2));
+			break;
+		case 0b10: // STRB
+			arm7_writeb(reg(rb) + imm5, reg(rd));
+			break;
+		case 0b11: // LDRB
+			reg(rd) = arm7_readb(reg(rb) + imm5);
+			break;
+		}
+	} else if ((op & 0xF000) == 0x8000) { // THUMB.10 Load/store halfword
+		uint32_t rd = op & 7;
         uint32_t rb = (op >> 3) & 7;
         uint32_t imm5 = (op >> 6) & 31;
-        arm7_writeb(reg(rb) + imm5, reg(rd));
-    } else if ((op & 0xF800) == 0x7800) { // ldrb rd, [rb, imm5]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        reg(rd) = arm7_readb(reg(rb) + imm5);
-    } else if ((op & 0xF800) == 0x8000) { // strh rd, [rb, imm5]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        arm7_writeh(reg(rb) + (imm5 << 1), reg(rd));
-    } else if ((op & 0xF800) == 0x8800) { // ldrh rd, [rb, imm5]
-        uint32_t rd = op & 7;
-        uint32_t rb = (op >> 3) & 7;
-        uint32_t imm5 = (op >> 6) & 31;
-        reg(rd) = arm7_readh(reg(rb) + (imm5 << 1));
-    } else if ((op & 0xF800) == 0x9000) { // str rd, [r13, imm8]
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        arm7_write(reg(13) + (imm8 << 2), reg(rd));
-    } else if ((op & 0xF800) == 0x9800) { // ldr rd, [r13, imm8]
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        reg(rd) = arm7_read(reg(13) + (imm8 << 2));
-    } else if ((op & 0xF800) == 0xA000) { // add rd, r15, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        reg(rd) = (r15 & 0xFFFFFFFD) + (imm8 << 2);
-    } else if ((op & 0xF800) == 0xA800) { // add rd, r13, imm8
-        uint32_t imm8 = op & 255;
-        uint32_t rd = (op >> 8) & 7;
-        reg(rd) = reg(13) + (imm8 << 2);
-    } else if ((op & 0xFF80) == 0xB000) { // add r13, imm7
-        uint32_t imm7 = op & 127;
-        reg(13) += (imm7 << 2);
-    } else if ((op & 0xFF80) == 0xB080) { // add r13, -imm7
-        uint32_t imm7 = op & 127;
-        reg(13) -= (imm7 << 2);
-    } else if ((op & 0xFF00) == 0xB400) { // push {rlist}
-        uint32_t rlist = op & 255;
-        for (int i = 7; i >= 0; i--)
+        if (op & (1 << 11)) // LDRH
         {
-            if (rlist & (1 << i))
-            {
-                reg(13) -= 4;
-                arm7_write(reg(13), reg(i));
-            }
+        	reg(rd) = arm7_readh(reg(rb) + (imm5 << 1));
+        } else { // STRH
+        	arm7_writeh(reg(rb) + (imm5 << 1), reg(rd));
         }
-    } else if ((op & 0xFF00) == 0xB500) { // push {rlist, lr}
-        uint32_t rlist = op & 255;
-        reg(13) -= 4;
-        arm7_write(reg(13), reg(14));
-        for (int i = 7; i >= 0; i--)
+	} else if ((op & 0xF000) == 0x9000) { // THUMB.11 SP-relative load/store
+		uint32_t imm8 = op & 0xFF;
+		uint32_t rd = (op >> 8) & 7;
+		if (op & (1 << 11)) // LDR
         {
-            if (rlist & (1 << i))
-            {
-                reg(13) -= 4;
-                arm7_write(reg(13), reg(i));
-            }
+        	reg(rd) = arm7_read(reg(13) + (imm8 << 2));
+        } else { // STR
+        	arm7_write(reg(13) + (imm8 << 2), reg(rd));
         }
-    } else if ((op & 0xFF00) == 0xBC00) { // pop {rlist}
-        uint32_t rlist = op & 255;
-        for (int i = 7; i >= 0; i++)
-        {
-            if (rlist & (1 << i))
-            {
-                reg(i) = arm7_read(reg(13));
-                reg(13) += 4;
-            }
-        }
-    } else if ((op & 0xFF00) == 0xBD00) { // pop {rlist, pc}
-        uint32_t rlist = op & 255;
-        for (int i = 7; i >= 0; i++)
-        {
-            if (rlist & (1 << i))
-            {
-                reg(i) = arm7_read(reg(13));
-                reg(13) += 4;
-            }
-        }
-        r15 = arm7_read(reg(13));
-        branched = true;
-        pipe_state = 0; // Clear the pipeline!!!!111elf
-    } else if ((op & 0xF800) == 0xC000) { // stmia rb!, {rlist}
-        uint32_t rlist = op & 255;
-        uint32_t rb = (op >> 8) & 7;
-        for (int i = 7; i >= 0; i--)
-        {
-            if (rlist & (1 << i))
-            {
-                arm7_write(reg(rb), reg(i));
-                reg(rb) += 4;
-            }
-        }
-    } else if ((op & 0xF800) == 0xC800) { // ldmia rb!, {rlist}
-        uint32_t rlist = op & 255;
-        uint32_t rb = (op >> 8) & 7;
-        for (int i = 7; i >= 0; i--)
-        {
-            if (rlist & (1 << i))
-            {
-                reg(i) = arm7_read(reg(rb));
-                reg(rb) += 4;
-            }
-        }
-    } else if ((op & 0xFF00) == 0xD000) { // beq label
-        uint32_t simm8 = op & 255;
-        if (BZERO)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
+	} else if ((op & 0xF000) == 0xA000) { // THUMB.12 Load address
+		uint32_t imm8 = op & 0xFF;
+		uint32_t rd = (op >> 8) & 7;
+		if (op & (1 << 11)) // SP
+		{
+			reg(rd) = reg(13) + (imm8 << 2);
+		} else { // PC
+			reg(rd) = (r15 & 0xFFFFFFFD) + (imm8 << 2);
+		}
+	} else if ((op & 0xFF00) == 0xB000) { // THUMB.13 Add offset to stack pointer
+		uint32_t imm7 = op & 0x7F;
+		if (op & 0x80) reg(13) -= imm7;
+			else reg(13) += imm7;
+	} else if ((op & 0xF600) == 0xB200) { // THUMB.14 push/pop registers
+		uint32_t rlist = op & 0xFF;
+		if (op & (1 << 11)) // POP
+		{
+			// read registers
+			for (int i = 7; i >= 0; i++)
+	        {
+	            if (rlist & (1 << i))
+	            {
+	                reg(i) = arm7_read(reg(13));
+	                reg(13) += 4;
+	            }
+	        }
+	        // restore pc if neccessary
+	        if (op & (1 << 8))
+	        {
+	        	r15 = arm7_read(reg(13));
+	        	branched = true;
+	        	pipe_state = 0;
+			}
+		} else { // PUSH
+			// save lr if neccessary
+			if (op & (1 << 8))
+			{
+				reg(13) -= 4;
+	        	arm7_write(reg(13), reg(14));
+	        }
+	        // write other registers
+	        for (int i = 7; i >= 0; i--)
+	        {
+	            if (rlist & (1 << i))
+	            {
+	                reg(13) -= 4;
+	                arm7_write(reg(13), reg(i));
+	            }
+	        }
+		}
+	} else if ((op & 0xF000) == 0xC000) { // THUMB.15 Multiple load/store
+		uint32_t rlist = op & 0xFF;
+		uint32_t rb = (op >> 8) & 7;
+		if (op & (1 << 11)) // LDMIA
+		{
+			for (int i = 7; i >= 0; i--)
+	        {
+	            if (rlist & (1 << i))
+	            {
+	                reg(i) = arm7_read(reg(rb));
+	                reg(rb) += 4;
+	            }
+	        }
+		} else { // STMIA
+			for (int i = 7; i >= 0; i--)
+	        {
+	            if (rlist & (1 << i))
+	            {
+	                arm7_write(reg(rb), reg(i));
+	                reg(rb) += 4;
+	            }
+	        }
+		}
+	} else if ((op & 0xF000) == 0xD000) { // THUMB.16 Conditional branch
+		uint32_t simm8 = op & 255;
+		bool cond_met = false;
+
+		// calculate corresponding condition
+		switch ((op >> 8) & 0xF)
+		{
+		case 0b0000: cond_met = BZERO; break;
+		case 0b0001: cond_met = !BZERO; break;
+		case 0b0010: cond_met = BCARRY; break;
+		case 0b0011: cond_met = !BCARRY; break;
+		case 0b0100: cond_met = BSIGN; break;
+		case 0b0101: cond_met = !BSIGN; break;
+		case 0b0110: cond_met = BOVERFLOW; break;
+		case 0b0111: cond_met = !BOVERFLOW; break;
+		case 0b1000: cond_met = BCARRY && !BZERO; break;
+		case 0b1001: cond_met = !BCARRY || BZERO; break;
+		case 0b1010: cond_met = BSIGN == BOVERFLOW; break;
+		case 0b1011: cond_met = BSIGN ^ BOVERFLOW; break; // check
+		case 0b1100: cond_met = !BZERO && (BSIGN == BOVERFLOW); break;
+		case 0b1101: cond_met = BZERO || (BSIGN ^ BOVERFLOW); break;
+		} 
+
+		if (cond_met)
+		{
+			if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
             r15 += (simm8 << 1);
             branched = true;
             pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD100) { // bne label
-        uint32_t simm8 = op & 255;
-        if (!BZERO)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD200) { // bcs label
-        uint32_t simm8 = op & 255;
-        if (BCARRY)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD300) { // bcc label
-        uint32_t simm8 = op & 255;
-        if (!CARRY)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD400) { // bmi label
-        uint32_t simm8 = op & 255;
-        if (BSIGN)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD500) { // bpl label
-        uint32_t simm8 = op & 255;
-        if (!BSIGN)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD600) { // bvs label
-        uint32_t simm8 = op & 255;
-        if (BOVERFLOW)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD700) { // bvc label
-        uint32_t simm8 = op & 255;
-        if (!BOVERFLOW)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD800) { // bhi label
-        uint32_t simm8 = op & 255;
-        if (BCARRY && !BZERO)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xD900) { // bls label
-        uint32_t simm8 = op & 255;
-        if (!BCARRY && BZERO)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xDA00) { // bge label
-        uint32_t simm8 = op & 255;
-        if (BSIGN == BOVERFLOW)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xDB00) { // blt label
-        uint32_t simm8 = op & 255;
-        if ( (BSIGN && !BOVERFLOW) || (!BSIGN && BOVERFLOW) )
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xDC00) { // bgt label
-        uint32_t simm8 = op & 255;
-        if (!BZERO && BSIGN == BOVERFLOW )
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xDD00) { // ble label
-        uint32_t simm8 = op & 255;
-        if (BZERO || BSIGN != BOVERFLOW)
-        {
-            if (simm8 & 0x80) simm8 |= 0xFFFFFF00;
-            r15 += (simm8 << 1);
-            branched = true;
-            pipe_state = 0;
-        }
-    } else if ((op & 0xFF00) == 0xDF00) { // swi
-        reg(14) = r15 - 2;
+		}
+	} else if ((op & 0xFF00) == 0xDF00) { // THUMB.17 Software Interrupt
+		reg(14) = r15 - 2;
         spsr_svc = cpsr;
         r15 = 0x8;
         cpsr &= 0xFFFFFFDF;
@@ -833,29 +716,66 @@ void arm7_execute_thumb(uint32_t opcode)
         arm7_update_regs();
         branched = true;
         pipe_state = 0;
-    } else if ((op & 0xF800) == 0xE000) { // b label
+	} else if ((op & 0xF800) == 0xE000) { // THUMB.18 Unconditional branch
         uint32_t imm11 = op & 2047;
         r15 += imm11 << 1;
         branched = true;
         pipe_state = 0;
-    } else if ((op & 0xF800) == 0xF000) { // bl imm11
-        uint32_t imm11 = op & 2047;
-        reg(14) = r15 + (imm11 << 12);
-    } else if ((op & 0xF800) == 0xF800) { // bh imm11
-        uint32_t imm11 = op & 2047;
-        uint32_t temp = r15 - 2;
-        r15 = reg(14) + (imm11 << 1);
-        reg(14) = temp | 1;
-        branched = true;
-        pipe_state = 0;
+    } else if ((op & 0xF000) == 0xF000) { // THUMB.19 Long branch with link
+    	uint32_t imm11 = op & 2047;
+    	if (op & (1 << 11)) // BH
+    	{
+    		uint32_t temp = r15 - 2;
+	        r15 = reg(14) + (imm11 << 1);
+	        reg(14) = temp | 1;
+	        branched = true;
+	        pipe_state = 0;
+    	} else { // BL
+    		reg(14) = r15 + (imm11 << 12);
+    	}
     } else {
-        printf("Unknown instruction at PC=%x", r15 - 4);
+		ERROR("Invalid instruction pc=%x", r15);
+		arm7_regdump();
 	}
 
     //arm7_regdump();
     //char test[1337];
     //gets(test);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void arm7_execute(uint32_t op)
 {
@@ -1159,8 +1079,8 @@ void arm7_execute(uint32_t op)
                 }
             } else if ((op & 0xF0) == 0b10010000) { // Multiply / Multiply Long / Single Data Swap
                 ERROR("Multiply (Long) / Single Data Swap not implemented");
-                char test[1337];
-                gets(test);
+                //char test[1337];
+                //gets(test);
             } else { // Halfword Data Transfer
                 uint32_t sh = (op >> 5) & 3;
                 uint32_t rd = (op >> 12) & 0xF;
