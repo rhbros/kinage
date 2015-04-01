@@ -330,6 +330,8 @@ void arm7_regdump()
 
 void arm7_execute_thumb(uint32_t op)
 {
+	//NOTICE("OP: %x", op);
+	//NOTICE("PC: %x", r15 - 4);
 	if ((op & 0xF800) < 0x1800) // THUMB.1 Move shifted register
 	{
 		uint32_t rd = op & 7;
@@ -522,7 +524,7 @@ void arm7_execute_thumb(uint32_t op)
 	} else if ((op & 0xF800) == 0x4800) { // THUMB.6 PC-relative load
 		uint32_t imm8 = op & 0xFF;
 		uint32_t rd = (op >> 8) & 7;
-		reg(rd) = arm7_read(r15 + (imm8 << 2));
+		reg(rd) = arm7_read((r15 & 0xFFFFFFFD) + (imm8 << 2));
 	} else if ((op & 0xF200) == 0x5000) { // THUMB.7 Load/store with register offset
 		uint32_t rd = op & 7;
 		uint32_t rb = (op >> 3) & 7;
@@ -616,12 +618,12 @@ void arm7_execute_thumb(uint32_t op)
 		uint32_t imm7 = op & 0x7F;
 		if (op & 0x80) reg(13) -= imm7;
 			else reg(13) += imm7;
-	} else if ((op & 0xF600) == 0xB200) { // THUMB.14 push/pop registers
+	} else if ((op & 0xF600) == 0xB400) { // THUMB.14 push/pop registers
 		uint32_t rlist = op & 0xFF;
 		if (op & (1 << 11)) // POP
 		{
 			// read registers
-			for (int i = 7; i >= 0; i++)
+			for (int i = 0; i <= 7; i++)
 	        {
 	            if (rlist & (1 << i))
 	            {
@@ -632,9 +634,10 @@ void arm7_execute_thumb(uint32_t op)
 	        // restore pc if neccessary
 	        if (op & (1 << 8))
 	        {
-	        	r15 = arm7_read(reg(13));
+	        	r15 = arm7_read(reg(13)) & ~0x1;
 	        	branched = true;
 	        	pipe_state = 0;
+	        	reg(13) += 4;
 			}
 		} else { // PUSH
 			// save lr if neccessary
@@ -658,7 +661,7 @@ void arm7_execute_thumb(uint32_t op)
 		uint32_t rb = (op >> 8) & 7;
 		if (op & (1 << 11)) // LDMIA
 		{
-			for (int i = 7; i >= 0; i--)
+			for (int i = 0; i <= 7; i++)
 	        {
 	            if (rlist & (1 << i))
 	            {
@@ -667,7 +670,7 @@ void arm7_execute_thumb(uint32_t op)
 	            }
 	        }
 		} else { // STMIA
-			for (int i = 7; i >= 0; i--)
+			for (int i = 0; i <= 7; i++)
 	        {
 	            if (rlist & (1 << i))
 	            {
@@ -717,10 +720,13 @@ void arm7_execute_thumb(uint32_t op)
         branched = true;
         pipe_state = 0;
 	} else if ((op & 0xF800) == 0xE000) { // THUMB.18 Unconditional branch
-        uint32_t imm11 = op & 2047;
-        r15 += imm11 << 1;
+        uint32_t imm11 = (op & 0x3FF) << 1;
+        if (op & 0x400)
+        	imm11 |= 0xFFFFF800;
+        r15 += imm11;
         branched = true;
         pipe_state = 0;
+        //NOTICE("mööp %x", (~(imm11<<1)) & 0x3FF);
     } else if ((op & 0xF000) == 0xF000) { // THUMB.19 Long branch with link
     	uint32_t imm11 = op & 2047;
     	if (op & (1 << 11)) // BH
@@ -801,7 +807,7 @@ void arm7_execute(uint32_t op)
     case 0xE: cond_given = true; break;
     case 0xF: cond_given = false; break;
     }
-    NOTICE("ARM EXECUTION @ %x", r15 - 8);
+    //NOTICE("ARM EXECUTION @ %x", r15 - 8);
     if (cond_given)
     {
         //NOTICE("CONDITION MET!");
@@ -1652,7 +1658,7 @@ void arm7_execute(uint32_t op)
 		}
     }
         
-    arm7_regdump();
+    //arm7_regdump();
     //char test[1337];
     //gets(test);
 }

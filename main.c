@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 
     while (running)
     {
-        for (int i = 0; i < 10000000; i++)
+        for (int i = 0; i < 100000; i++)
             arm7_step();
         //ERROR("Drawing")
         for (int y = 0; y < 160; y++)
